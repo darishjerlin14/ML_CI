@@ -58,5 +58,6 @@ jobs:
     - name: Upload trained model as artifact
       uses: actions/upload-artifact@v4
       with:
-        name: trained-model
+        name: trained-model-${{ matrix.python-version }}
         path: model.pkl
+
