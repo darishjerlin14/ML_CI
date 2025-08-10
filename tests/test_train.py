@@ -2,6 +2,7 @@ import os
 import joblib
 from src.train import train_model
 
+
 def test_model_training():
     model = train_model()
     assert model is not None
