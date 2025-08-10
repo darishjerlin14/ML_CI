@@ -9,18 +9,54 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9, 3.10]
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python
+    - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
 
     - name: Install dependencies
-      run: pip install -r requirements.txt
+      run: pip install -r requirements.txt flake8
 
-    - name: Run tests
-      run: pytest
+    - name: Lint code
+      run: flake8 src tests --max-line-length=100
+
+    - name: Run tests with accuracy threshold
+      run: |
+        pytest --maxfail=1 --disable-warnings -q
+        python - <<EOF
+        import joblib
+        import pandas as pd
+        from sklearn.metrics import accuracy_score
+
+        model = joblib.load("model.pkl")
+        df = pd.read_csv("data/sample.csv")
+        X = df[["feature1", "feature2"]]
+        y = df["target"]
+
+        acc = accuracy_score(y, model.predict(X))
+        print(f"Model accuracy: {acc}")
+        if acc < 0.8:
+            raise SystemExit("❌ Accuracy below threshold! Failing CI.")
+        EOF
+
+    - name: Upload trained model as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: trained-model
+        path: model.pkl
